@@ -1,7 +1,28 @@
 import express from "express";
+import cors from "cors";
+import "express-async-errors";
+import dotenv from "dotenv";
 
+dotenv.config();
+console.log("ATLAS_URI:", process.env.ATLAS_URI);
+console.log("PORT:", process.env.PORT);
+import devices from "./routes/devices.js";
+
+const PORT = process.env.PORT || 5001;
 const app = express();
 
-app.listen(5001, () => console.log("Api  is running on port 5001"));
+app.use(cors());
+app.use(express.json());
 
-app.get("/", (req, res) => res.json({ message: "Welcome to the api" }));
+// Load the /posts routes
+app.use("/devices", devices);
+
+// Global error handling
+app.use((err, _req, res, next) => {
+  res.status(500).send("Uh oh! An unexpected error occured.");
+});
+
+// start the Express server
+app.listen(PORT, () => {
+  console.log(`Server is running on port: ${PORT}`);
+});
