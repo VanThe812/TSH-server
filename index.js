@@ -1,12 +1,9 @@
 import express from "express";
 import cors from "cors";
+import "./loadEnvironment.mjs";
 import "express-async-errors";
-import dotenv from "dotenv";
-
-dotenv.config();
-console.log("ATLAS_URI:", process.env.ATLAS_URI);
-console.log("PORT:", process.env.PORT);
 import devices from "./routes/devices.js";
+import user from "./routes/user.js";
 
 const PORT = process.env.PORT || 5001;
 const app = express();
@@ -14,8 +11,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Load the /posts routes
 app.use("/devices", devices);
+app.use("/user", user);
 
 // Global error handling
 app.use((err, _req, res, next) => {
