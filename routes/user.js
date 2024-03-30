@@ -46,7 +46,7 @@ router.post("/register", async (req, res) => {
       address,
       email,
       gender,
-      account,
+      account: account.trim(),
       password: hashedPassword,
       timecreate,
       timemodifile: timecreate,
