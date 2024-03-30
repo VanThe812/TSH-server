@@ -249,4 +249,53 @@ router.post("/change-password", async (req, res) => {
   }
 });
 
+// Update indfo user
+router.post("/update-info", async (req, res) => {
+  try {
+    const { fullname, dateOfBirth, address, email, gender, token } = req.body;
+
+    //Xác thực
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decodedToken.id;
+
+    // Tìm người dùng dựa trên userId
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 1, message: "User not found." });
+    }
+
+    user.fullname = fullname;
+    user.dateOfBirth = dateOfBirth;
+    user.address = address;
+    user.email = email;
+    user.gender = gender;
+
+    await user.save();
+    const userJson = user.toJSON();
+    delete userJson.password;
+    res.json({ ...userJson });
+  } catch (error) {
+    console.log(error);
+    let errorMessage = "An error occurred.";
+    if (error.errors) {
+      errorMessage = Object.values(error.errors)
+        .map((err) => err.message)
+        .join(", ");
+    }
+    if (error.message) {
+      errorMessage = error.name + ": " + error.message;
+    }
+    res.status(500).json({
+      error: 1,
+      message: errorMessage,
+    });
+  }
+});
+
+// Admin
+// Create user
+// Update user
+// Delete user
+// User detail
+
 export default router;
