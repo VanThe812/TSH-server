@@ -6,8 +6,45 @@ import User from "../models/user.js";
 import Role from "../models/role.js";
 import Permission from "../models/permission.js";
 import jwt from "jsonwebtoken";
-
+import nodemailer from "nodemailer";
 const router = express.Router();
+
+const transporter = nodemailer.createTransport({
+  // service: "smtp.gmail.com",
+  // port: 1025,
+  // secure: true,
+  // auth: {
+  //   user: "vvthe8102002.01@gmail.com",
+  //   pass: "vteojmidukbspmrd",
+  // },
+  host: "localhost",
+  port: 1025,
+  secure: false,
+});
+
+function generateRandomPassword() {
+  const uppercaseLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lowercaseLetters = "abcdefghijklmnopqrstuvwxyz";
+  const numbers = "0123456789";
+
+  const allCharacters = uppercaseLetters + lowercaseLetters + numbers;
+
+  let password = "";
+
+  // Thêm một ký tự viết hoa ở đầu mật khẩu
+  password += uppercaseLetters.charAt(
+    Math.floor(Math.random() * uppercaseLetters.length)
+  );
+
+  // Thêm các ký tự ngẫu nhiên
+  for (let i = 0; i < 7; i++) {
+    password += allCharacters.charAt(
+      Math.floor(Math.random() * allCharacters.length)
+    );
+  }
+
+  return password;
+}
 
 // Create user
 
@@ -61,7 +98,6 @@ router.post("/register", async (req, res) => {
     delete userJson.password;
     res.json({ ...userJson, token });
   } catch (err) {
-    console.error("Error registering user:", err);
     let errorMessage = "An error occurred while registering the user.";
 
     // Kiểm tra nếu lỗi là do validation, lấy thông tin chi tiết về lỗi validation
@@ -79,7 +115,6 @@ router.post("/register", async (req, res) => {
 });
 
 // Login
-
 router.post("/login", async function (req, res) {
   try {
     const { account, password } = req.body;
@@ -92,9 +127,11 @@ router.post("/login", async function (req, res) {
     const user = await User.findOne({ account });
     console.log(user);
     if (user) {
-      bcrypt.compare(password, user.password, (err, result) => {
+      bcrypt.compare(password, user.password, async (err, result) => {
         console.log(err, result);
         if (result) {
+          await user.updateOne({ timeaccess: Math.floor(Date.now() / 1000) });
+
           const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
             expiresIn: "7d",
           });
@@ -112,7 +149,104 @@ router.post("/login", async function (req, res) {
         .status(404)
         .json({ error: 1, message: "Your account or password is wrong" });
     }
-  } catch (error) {}
+  } catch (error) {
+    let errorMessage = "An error occurred while registering the user.";
+    console.log(error);
+    res.status(500).json({
+      error: 1,
+      message: errorMessage,
+    });
+  }
+});
+
+// Forgot password
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Kiểm tra xem người dùng có tồn tại không
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ error: 1, message: "User not found." });
+    }
+
+    const randomPassword = generateRandomPassword();
+    console.log("randomPassword: ", randomPassword);
+    // Cập nhật mật khẩu mới cho người dùng
+    user.password = await bcrypt.hash(randomPassword, 10);
+    user.status_account = "forgotpass";
+    await user.save();
+    // Tạo nội dung email
+    const mailOptions = {
+      from: user.email,
+      to: email,
+      subject: "Reset Password to TSH",
+      html: `This is your account: ${user.account} </br> New password: ${randomPassword}`,
+    };
+
+    // Gửi email
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.error("Error sending forgot password email:", error);
+        res.status(500).json({
+          error: 1,
+          message: "An error occurred while sending the email.",
+        });
+      } else {
+        console.log("Email sent: " + info.response);
+        res.status(200).json({
+          error: 0,
+          message: "Email sent successfully. Please check your inbox.",
+        });
+      }
+    });
+  } catch (error) {
+    let errorMessage = "An error occurred.";
+    res.status(500).json({
+      error: 1,
+      message: errorMessage,
+    });
+  }
+});
+
+// Change password
+router.post("/change-password", async (req, res) => {
+  try {
+    const { token, oldPassword, newPassword } = req.body;
+
+    //Xác thực
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decodedToken.id;
+
+    // Tìm người dùng dựa trên userId
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 1, message: "User not found." });
+    }
+
+    bcrypt.compare(oldPassword, user.password, (req2, res2) => {
+      if (!res2) {
+        return res
+          .status(403)
+          .json({ error: 1, message: "Wrong current password." });
+      } else {
+        // Mã hóa mật khẩu mới
+        const hashedPassword = bcrypt.hashSync(newPassword, 10);
+        user.password = hashedPassword;
+        user.save();
+        const userJson = user.toJSON();
+        delete userJson.password;
+        res.json({ ...userJson });
+      }
+    });
+  } catch (err) {
+    console.log(err);
+    let errorMessage = "An error occurred.";
+    res.status(500).json({
+      error: 1,
+      message: errorMessage,
+    });
+  }
 });
 
 export default router;
