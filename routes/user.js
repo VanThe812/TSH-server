@@ -1,12 +1,11 @@
 import express from "express";
 import db from "../db/conn.mjs";
-import bcrypt from "bcrypt";
+import bcrypt, { hash } from "bcrypt";
 import { ObjectId } from "mongodb";
 import User from "../models/user.js";
 import Role from "../models/role.js";
 import Permission from "../models/permission.js";
-// const User = require("../models/user.js");
-// const Role = require("../models/role.js");
+import jwt from "jsonwebtoken";
 
 const router = express.Router();
 
@@ -38,7 +37,7 @@ router.post("/register", async (req, res) => {
     });
 
     const roleClient = await Role.findOne({ name_role: "client" });
-    console.log("Role: ", roleClient);
+
     // Tạo người dùng mới
     const newUser = new User({
       fullname,
@@ -53,14 +52,14 @@ router.post("/register", async (req, res) => {
       role_id: roleClient._id,
     });
 
-    // await newUser.save();
     await User.create(newUser);
-    // await db.collection("user").insertOne(newUser.toJSON());
 
-    res.status(201).json({
-      error: 0,
-      message: "The user has been successfully registered.",
+    const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
     });
+    const userJson = newUser.toJSON();
+    delete userJson.password;
+    res.json({ ...userJson, token });
   } catch (err) {
     console.error("Error registering user:", err);
     let errorMessage = "An error occurred while registering the user.";
@@ -80,5 +79,40 @@ router.post("/register", async (req, res) => {
 });
 
 // Login
+
+router.post("/login", async function (req, res) {
+  try {
+    const { account, password } = req.body;
+
+    if (!account || !password) {
+      return res
+        .status(400)
+        .json({ error: 1, message: "Account or Password is missing" });
+    }
+    const user = await User.findOne({ account });
+    console.log(user);
+    if (user) {
+      bcrypt.compare(password, user.password, (err, result) => {
+        console.log(err, result);
+        if (result) {
+          const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+            expiresIn: "7d",
+          });
+          const userJson = user.toJSON();
+          delete userJson.password;
+          res.json({ ...userJson, token });
+        } else {
+          res
+            .status(400)
+            .json({ error: 1, message: "Invalid Account/Password" });
+        }
+      });
+    } else {
+      return res
+        .status(404)
+        .json({ error: 1, message: "Your account or password is wrong" });
+    }
+  } catch (error) {}
+});
 
 export default router;
