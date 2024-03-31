@@ -10,16 +10,16 @@ import nodemailer from "nodemailer";
 const router = express.Router();
 
 const transporter = nodemailer.createTransport({
-  // service: "smtp.gmail.com",
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
+  auth: {
+    user: "vvthe8102002@gmail.com",
+    pass: "vteojmidukbspmrd",
+  },
+  // host: "localhost",
   // port: 1025,
-  // secure: true,
-  // auth: {
-  //   user: "vvthe8102002.01@gmail.com",
-  //   pass: "vteojmidukbspmrd",
-  // },
-  host: "localhost",
-  port: 1025,
-  secure: false,
+  // secure: false,
 });
 
 function generateRandomPassword() {
@@ -171,14 +171,13 @@ router.post("/forgot-password", async (req, res) => {
     }
 
     const randomPassword = generateRandomPassword();
-    console.log("randomPassword: ", randomPassword);
     // Cập nhật mật khẩu mới cho người dùng
     user.password = await bcrypt.hash(randomPassword, 10);
     user.status_account = "forgotpass";
     await user.save();
     // Tạo nội dung email
     const mailOptions = {
-      from: user.email,
+      from: "no-reply@tsh.io.vn",
       to: email,
       subject: "Reset Password to TSH",
       html: `This is your account: ${user.account} </br> New password: ${randomPassword}`,

@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import "./loadEnvironment.mjs";
 import "express-async-errors";
+// import "./awsTokenManager.js";
 import devices from "./routes/devices.js";
 import user from "./routes/user.js";
 

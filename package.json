@@ -14,6 +14,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-iot": "^3.540.0",
+    "@aws-sdk/credential-provider-ini": "^3.540.0",
     "aws-sdk": "^2.1587.0",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
