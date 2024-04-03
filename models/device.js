@@ -15,24 +15,26 @@ const deviceSchema = new Schema({
     required: true,
   },
   timemodifile: Number,
-  user_id: {
+  userId: {
     type: Schema.Types.ObjectId,
     ref: "user",
   },
-  room_id: {
+  roomId: {
     type: Schema.Types.ObjectId,
     ref: "room",
   },
   current_status: {
     type: String,
     enum: ["on", "off"],
+    default: "off",
   },
   sensor_data: {
     type: Number,
     min: 0,
     max: 100,
+    default: 0
   },
-  name_in_home: String,
+  name: String,
   version: String,
   thingArn: {
     type: String,
