@@ -5,7 +5,9 @@ import "express-async-errors";
 // import "./awsTokenManager.js";
 import devices from "./routes/devices.js";
 import user from "./routes/user.js";
-import room from "./routes/room.js"
+import room from "./routes/room.js";
+
+import { main } from "./actions/assumeRole.js";
 
 const PORT = process.env.PORT || 5001;
 const app = express();
@@ -16,6 +18,12 @@ app.use(express.json());
 app.use("/devices", devices);
 app.use("/user", user);
 app.use("/room", room);
+
+// Refesh token
+setInterval(() => {
+  main();
+  console.log("assumeRole run");
+}, 900000);
 
 // Global error handling
 app.use((err, _req, res, next) => {

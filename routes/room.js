@@ -3,6 +3,7 @@ import User from "../models/user.js";
 import Rool from "../models/room.js";
 import jwt from "jsonwebtoken";
 import Room from "../models/room.js";
+import Device from "../models/device.js";
 
 const router = express.Router();
 
@@ -49,6 +50,37 @@ router.post("/createRoom", async (req, res) => {
       message: errorMessage,
     });
   }
+});
+
+router.post("/deleteRoom", async (req, res) => {
+  try {
+    const { token, roomId } = req.body;
+
+    if (!token || !roomId) {
+      return res.status(400).json({ error: 1, message: "Missing data" });
+    }
+    // Check token
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decodedToken.id;
+
+    // Tìm người dùng dựa trên userId
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(403).json({ error: 1, message: "Not permission" });
+    }
+
+    const isDevice = await Device.findOne({ roomId: roomId });
+    if (isDevice) {
+      return res
+        .status(403)
+        .json({
+          error: 1,
+          message: "Please move the devices to another room to continue",
+        });
+    }
+    await Device.findByIdAndDelete(roomId);
+    return res.status(200).json({ message: "Successfully deleted" });
+  } catch (error) {}
 });
 
 export default router;

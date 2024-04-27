@@ -23,6 +23,14 @@ const deviceSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: "room",
   },
+  numberOfSubDevice: Number,
+  subDevice: [
+    {
+      name: String,
+      nameInHome: String,
+      data: Number,
+    },
+  ],
   current_status: {
     type: String,
     enum: ["on", "off"],
@@ -32,7 +40,7 @@ const deviceSchema = new Schema({
     type: Number,
     min: 0,
     max: 100,
-    default: 0
+    default: 0,
   },
   name: String,
   version: String,

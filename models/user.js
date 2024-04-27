@@ -37,10 +37,6 @@ const userSchema = new Schema({
       message: (props) => "Account must not contain spaces!",
     },
   },
-  status_account: {
-    type: String,
-    enum: ["active", "block", "forgotpass"],
-  },
   password: {
     type: String,
     required: true,
@@ -54,6 +50,10 @@ const userSchema = new Schema({
   role_id: {
     type: Schema.Types.ObjectId,
     ref: "role",
+  },
+  statusAccount: {
+    type: String,
+    enum: ["active", "block"],
   },
 });
 
