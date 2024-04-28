@@ -10,16 +10,16 @@ import nodemailer from "nodemailer";
 const router = express.Router();
 
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: "vvthe8102002@gmail.com",
-    pass: "vteojmidukbspmrd",
-  },
-  // host: "localhost",
-  // port: 1025,
-  // secure: false,
+  // host: "smtp.gmail.com",
+  // port: 465,
+  // secure: true,
+  // auth: {
+  //   user: "vvthe8102002@gmail.com",
+  //   pass: "vteojmidukbspmrd",
+  // },
+  host: "localhost",
+  port: 1025,
+  secure: false,
 });
 
 function generateRandomPassword() {

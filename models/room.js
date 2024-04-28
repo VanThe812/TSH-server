@@ -16,10 +16,6 @@ const roomSchema = new Schema({
     required: true,
   },
   timemodifile: Number,
-  roomBackground: {
-    type: String,
-    default: "image1.png",
-  },
 });
 
 export default model("Room", roomSchema);
