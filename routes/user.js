@@ -1,7 +1,6 @@
 import express from "express";
 import db from "../db/conn.mjs";
 import bcrypt, { hash } from "bcrypt";
-import { ObjectId } from "mongodb";
 import User from "../models/user.js";
 import Role from "../models/role.js";
 import Permission from "../models/permission.js";
@@ -68,12 +67,8 @@ router.post("/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const timecreate = Math.floor(Date.now() / 1000);
-    await Permission.create({
-      name_permission: "Use App",
-      timecreate: timecreate,
-    });
 
-    const roleClient = await Role.findOne({ name_role: "client" });
+    const roleClient = await Role.findOne({ name: "client" });
 
     // Tạo người dùng mới
     const newUser = new User({
@@ -82,16 +77,16 @@ router.post("/register", async (req, res) => {
       address,
       email,
       gender,
-      account: account.trim(),
+      account,
       password: hashedPassword,
       timecreate,
       timemodifile: timecreate,
-      role_id: roleClient._id,
+      roleId: roleClient._id,
     });
 
-    await User.create(newUser);
+    await newUser.save();
 
-    const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, {
+    const token = jwt.sign(newUser.toJSON(), process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
     const userJson = newUser.toJSON();
@@ -125,14 +120,12 @@ router.post("/login", async function (req, res) {
         .json({ error: 1, message: "Account or Password is missing" });
     }
     const user = await User.findOne({ account });
-    console.log(user);
     if (user) {
       bcrypt.compare(password, user.password, async (err, result) => {
-        console.log(err, result);
         if (result) {
           await user.updateOne({ timeaccess: Math.floor(Date.now() / 1000) });
 
-          const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+          const token = jwt.sign(user.toJSON(), process.env.JWT_SECRET, {
             expiresIn: "7d",
           });
           const userJson = user.toJSON();

@@ -21,6 +21,7 @@ import {
   encodeUint8Array,
   checkTimeThreshold,
 } from "../helpers/utils.js";
+import device from "../models/device.js";
 
 const router = express.Router();
 
@@ -34,7 +35,7 @@ router.post("/getListDevicesInHome", async (req, res) => {
         .send({ error: 1, message: "Missing a field request" });
 
     const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decodedToken.id;
+    const userId = decodedToken._id;
 
     // Tìm người dùng dựa trên userId
     const user = await User.findById(userId);
@@ -72,7 +73,7 @@ router.get("/getListDevicesInRoom", async (req, res) => {
         .send({ error: 1, message: "Missing a field request" });
 
     const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decodedToken.id;
+    const userId = decodedToken._id;
 
     // Tìm người dùng dựa trên userId
     const user = await User.findById(userId);
@@ -117,21 +118,22 @@ router.get("/getListDevicesInRoom", async (req, res) => {
 router.post("/checkDeviceAvailable", async (req, res) => {
   try {
     // Get params
-    const { thingName, token } = req.body;
+    const { deviceCode, token } = req.body;
 
+    const thingName = deviceCode;
     // Check params validated
     // thingName: required
     // token: required
     if (!thingName || !token) {
       return res.status(400).json({
         error: 1,
-        message: "'thingName' or 'token' is missing.",
+        message: "'deviceCode' or 'token' is missing.",
       });
     }
 
     // Verify user
     const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decodedToken.id;
+    const userId = decodedToken._id;
 
     // Tìm người dùng dựa trên userId
     const user = await User.findById(userId);
@@ -149,12 +151,12 @@ router.post("/checkDeviceAvailable", async (req, res) => {
     }
 
     // Kiểm tra thiết bị đã thuộc nhà nào chưa
-    if (device.userId && device.userId !== null) {
-      return res.status(403).json({
-        error: 1,
-        message: "The device already belongs to another house",
-      });
-    }
+    // if (device.userId && device.userId !== null) {
+    //   return res.status(403).json({
+    //     error: 1,
+    //     message: "The device already belongs to another house",
+    //   });
+    // }
 
     // Setup client
     const client = new IoTDataPlaneClient({
@@ -168,30 +170,125 @@ router.post("/checkDeviceAvailable", async (req, res) => {
     const response = await client.send(command);
 
     // Kiểm tra thiết bị có online trong 60s trở lại không
-    if (checkTimeThreshold(response.lastModifiedTime, 60)) {
-      // Data gửi tin nhắn cho thiết bị
-      const data = {
-        status: "confirm",
-        userId: user._id,
-      };
-      //Gửi yêu cầu confirm cho thiết bị
-      const inputForPublish = {
-        topic: thingName + "/sub", // required
-        payload: encodeUint8Array(data),
-        contentType: "UTF-8",
-      };
-      const commandF = new PublishCommand(inputForPublish);
-      const responseF = await client.send(commandF);
-      console.log(responseF);
-      return res.status(200).json({
-        message: true,
-      });
-    } else {
+    if (!checkTimeThreshold(response.lastModifiedTime, 60)) {
       return res.status(404).json({
         error: 1,
         message: "Device is not online",
       });
     }
+
+    const codeAccess = jwt.sign({ thingName }, process.env.JWT_SECRET, {
+      expiresIn: "10m",
+    });
+
+    return res.status(200).json({ codeAccess });
+  } catch (error) {
+    console.log(error);
+    let errorMessage = "An error occurred.";
+    if (error.errors) {
+      errorMessage = Object.values(error.errors)
+        .map((err) => err.message)
+        .join(", ");
+    }
+    if (error.message) {
+      errorMessage = error.name + ": " + error.message;
+    }
+    res.status(500).json({
+      error: 1,
+      message: errorMessage,
+    });
+  }
+});
+
+router.post("/addDeiveToHome", async (req, res) => {
+  try {
+    // Get params
+    const { deviceCode, token, codeAccess } = req.body;
+
+    const thingName = deviceCode;
+
+    // Check params validated
+    // thingName: required
+    // token: required
+    if (!thingName || !token) {
+      return res.status(400).json({
+        error: 1,
+        message: "'thingName' or 'token' is missing.",
+      });
+    }
+
+    // Verify user
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decodedToken._id;
+
+    // Tìm người dùng dựa trên userId
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(403).json({ error: 1, message: "Not permission" });
+    }
+
+    // Tìm thiết bị
+    const device = await Device.findOne({ thingName: thingName });
+    if (!device) {
+      return res.status(404).json({
+        error: 1,
+        message: "Device not found",
+      });
+    }
+
+    // Kiểm tra thiết bị đã thuộc nhà nào chưa
+    // if (device.userId && device.userId !== null) {
+    //   return res.status(403).json({
+    //     error: 1,
+    //     message: "The device already belongs to another house",
+    //   });
+    // }
+
+    // Setup client
+    const client = new IoTDataPlaneClient({
+      region: process.env.REGION,
+      credentials: AWS.config.credentials,
+    });
+    // Kiểm tra thiết bị có online trong 60s trở lại không
+    const input = {
+      topic: thingName + "/pub", // required
+    };
+    const command = new GetRetainedMessageCommand(input);
+    const response = await client.send(command);
+
+    if (!checkTimeThreshold(response.lastModifiedTime, 60)) {
+      return res.status(404).json({
+        error: 1,
+        message: "Device is not online",
+      });
+    }
+
+    const decodeAccessToken = jwt.verify(codeAccess, process.env.JWT_SECRET);
+    console.log(decodeAccessToken);
+    if (!decodeAccessToken.thingName === thingName) {
+      return res.status(200).json({
+        error: 1,
+        message: "Not permission",
+      });
+    }
+
+    // Data gửi tin nhắn cho thiết bị
+    const data = {
+      action: "confirm",
+      userId: user._id,
+    };
+    //Gửi yêu cầu confirm cho thiết bị
+    const inputForPublish = {
+      topic: thingName + "/sub", // required
+      payload: encodeUint8Array(data),
+      contentType: "UTF-8",
+    };
+    const commandF = new PublishCommand(inputForPublish);
+    const responseF = await client.send(commandF);
+    console.log(responseF);
+    return res.status(200).json({
+      message: true,
+    });
   } catch (error) {
     console.log(error);
     let errorMessage = "An error occurred.";
@@ -212,7 +309,9 @@ router.post("/checkDeviceAvailable", async (req, res) => {
 
 router.post("/getStatusConfirm", async (req, res) => {
   try {
-    const { thingName, token } = req.body;
+    const { deviceCode, token } = req.body;
+
+    const thingName = deviceCode;
 
     // Check params validated
     // thingName: required
@@ -225,7 +324,7 @@ router.post("/getStatusConfirm", async (req, res) => {
     }
 
     const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decodedToken.id;
+    const userId = decodedToken._id;
 
     // Tìm người dùng dựa trên userId
     const user = await User.findById(userId);
@@ -257,7 +356,7 @@ router.post("/getStatusConfirm", async (req, res) => {
 
       return res.status(200).json({ ...device.toJSON() });
     } else {
-      return res.status(404).json({
+      return res.status(200).json({
         error: 1,
         message: "Unverified device",
       });
@@ -282,16 +381,10 @@ router.post("/getStatusConfirm", async (req, res) => {
 
 router.post("/updateDevice", async (req, res) => {
   try {
-    const { token, deviceId, roomId, name } = req.body;
-
-    if (!token || !deviceId || !roomId || !name) {
-      return res
-        .status(400)
-        .json({ error: 1, message: "Missing a number of field request" });
-    }
+    const { token, deviceId, roomId, subDevice } = req.body;
 
     const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decodedToken.id;
+    const userId = decodedToken._id;
 
     // Tìm người dùng dựa trên userId
     const user = await User.findById(userId);
@@ -305,10 +398,24 @@ router.post("/updateDevice", async (req, res) => {
     }
 
     device.roomId = roomId;
-    device.name = name;
-    await device.save();
+    const newSubDevice = device.subDevice.map((item) => {
+      const replacement = subDevice.find(
+        (replacement) => replacement.nameSubDevice === item.nameSubDevice
+      );
+      if (replacement) {
+        return {
+          ...item,
+          nameInHome: replacement.nameInHome,
+        };
+      } else {
+        return item;
+      }
+    });
 
-    res.status(200).json({ ...device.toJSON() });
+    device.subDevice = newSubDevice;
+    await device.save();
+    return res.status(200).json(device);
+    // res.status(200).json({ ...device.toJSON() });
   } catch (error) {
     console.log(error);
     let errorMessage = "An error occurred.";
@@ -331,7 +438,7 @@ router.post("/getDataDevice", async (req, res) => {
   try {
     const { token, deviceId } = req.body;
     const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decodedToken.id;
+    const userId = decodedToken._id;
 
     // Tìm người dùng dựa trên userId
     const user = await User.findById(userId);
@@ -384,7 +491,7 @@ router.post("/deviceControl", async (req, res) => {
     const { token, status, deviceId, nameSubDevice } = req.body;
 
     const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decodedToken.id;
+    const userId = decodedToken._id;
 
     // Tìm người dùng dựa trên userId
     const user = await User.findById(userId);
@@ -440,9 +547,9 @@ router.post("/deviceControl", async (req, res) => {
 });
 
 // Create thing
-router.post("/admin/create-thing", async (req, res) => {
+router.post("/admin/createDevice", async (req, res) => {
   try {
-    const { name, description, type, version } = req.body;
+    const { token, description, typeDeviceId, numberOfSubDevice } = req.body;
     console.log(AWS.config.credentials);
     //Call API to AWS
     // const credentials = fromIni();
@@ -489,34 +596,3 @@ router.post("/admin/create-thing", async (req, res) => {
 });
 
 export default router;
-
-/*
-{
-  subDevice: [
-    {
-      name: "t",
-      data: 23.1
-    },
-    {
-      name: "h",
-      data: 84.5
-    }
-  ]
-}
-{
-  subDevice: [
-    {
-      name: "o1",
-      data: 0
-    },
-    {
-      name: "o2",
-      data: 1
-    },
-    {
-      name: "o3",
-      data: 1
-    }
-  ]
-}
-*/

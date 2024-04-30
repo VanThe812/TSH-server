@@ -16,6 +16,7 @@ const userSchema = new Schema({
   email: {
     type: String,
     required: true,
+    trim: true,
     validate: {
       validator: function (v) {
         return validator.isEmail(v);
@@ -30,6 +31,7 @@ const userSchema = new Schema({
   account: {
     type: String,
     required: true,
+    trim: true,
     validate: {
       validator: function (v) {
         return !validator.contains(v, " ");
@@ -47,7 +49,7 @@ const userSchema = new Schema({
     required: true,
   },
   timemodifile: Number,
-  role_id: {
+  roleId: {
     type: Schema.Types.ObjectId,
     ref: "role",
   },

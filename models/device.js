@@ -28,6 +28,7 @@ const deviceSchema = new Schema({
       nameSubDevice: String,
       nameInHome: String,
       data: Number,
+      defaultName: String,
     },
   ],
   version: String,

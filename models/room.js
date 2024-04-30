@@ -11,6 +11,10 @@ const roomSchema = new Schema({
     type: String,
     required: true,
   },
+  defaultName: {
+    type: String,
+    required: true,
+  },
   timecreate: {
     type: Number,
     required: true,
